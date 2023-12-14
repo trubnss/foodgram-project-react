@@ -15,7 +15,7 @@ services:
 
 
   backend:
-    build: ../backend/
+    image: trubnss/foodgram_backend
     env_file: ../.env
     volumes:
       - static:/backend_static/
@@ -26,16 +26,16 @@ services:
       - frontend
 
   frontend:
-    build:
-      context: ../frontend
-      dockerfile: Dockerfile
+    image: trubnss/foodgram_frontend
     volumes:
       - ../frontend/:/app/result_build/
+    depends_on:
+      - db
 
   nginx:
     image: nginx:1.19.3
     ports:
-      - "80:80"
+      - "8000:80"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
       - ../frontend/build:/usr/share/nginx/html/

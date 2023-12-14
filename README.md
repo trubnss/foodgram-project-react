@@ -35,11 +35,12 @@ ALLOWED_HOSTS=
 ```
 
 
-**_Документация будет доступна по адресу: http://localhost/api/docs/_**
+**_Документация будет доступна по адресу: http://foodgramfortraining.zapto.org/api/docs/_**
 
-**_Доступ к Админке_**
+**_Данные для ревью_**
 ```commandline
-admin:  yc-user
+foodgramfortraining.zapto.org
+admin:  yc-user@yandex.fack
 pass: JlOv3bJ-5z
 ```
 
