@@ -6,7 +6,7 @@ Foodgram, «Продуктовый помощник». Онлайн-сервис
 
 **_Клонировать репозиторий:_**
 ```
-git@github.com:trubnss/Foodgram.git
+git@github.com:trubnss/foodgram-project-react.git
 ```
 Установить на сервере Docker
 
