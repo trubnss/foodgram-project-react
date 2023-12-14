@@ -80,7 +80,7 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
-          source: "docker-compose.yml"
+          source: "infra/"
           target: "foodgram-project-react/infra"
       - name: Executing remote ssh commands to deploy
         uses: appleboy/ssh-action@master
