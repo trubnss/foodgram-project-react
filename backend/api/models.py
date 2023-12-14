@@ -104,7 +104,7 @@ class Recipe(models.Model):
     )
     image = models.ImageField(
         verbose_name="Картинка рецепта",
-        upload_to="media/",
+        upload_to="",
         help_text="Добавьте изображение рецепта",
     )
     pub_date = models.DateTimeField(
