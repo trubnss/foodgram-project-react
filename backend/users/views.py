@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import action
 from djoser.serializers import SetPasswordSerializer
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from api.paginations import ApiPagination
 from django.shortcuts import get_object_or_404
 
@@ -17,7 +17,7 @@ class UserViewSet(viewsets.ModelViewSet):
     """Viewset для пользователя / подписок."""
 
     queryset = User.objects.all()
-    permission_classes = (AllowAny,)
+    permission_classes = (IsCurrentUserOrAdminOrReadOnly,)
     pagination_class = ApiPagination
     serializer_class = UserSerializer
 
