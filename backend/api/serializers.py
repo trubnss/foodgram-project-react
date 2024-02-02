@@ -144,7 +144,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
         for item in ingredients:
             amount = item.get("amount", 0)
-            if amount < 1:
+            if int(amount) < 1:
                 raise serializers.ValidationError(
                     {
                         "ingredients": "Количество ингредиента"
