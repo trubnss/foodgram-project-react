@@ -5,7 +5,6 @@ from recipes.models import Ingredient
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Добавляем путь к файлу ingredients.csv
 file_path = os.path.join(BASE_DIR, "data", "ingredients.csv")
 
 
