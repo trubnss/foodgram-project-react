@@ -75,8 +75,10 @@ class Recipe(models.Model):
         verbose_name="Время приготовления",
         blank=False,
     )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering = ['-created_at']
         verbose_name = "Рецепт"
         verbose_name_plural = "Рецепты"
 
