@@ -32,6 +32,7 @@ class RecipeAdmin(admin.ModelAdmin):
         "name",
         "author",
         "get_ingredients",
+        "get_favorites_count",
     )
     list_filter = (
         "author",
@@ -41,11 +42,13 @@ class RecipeAdmin(admin.ModelAdmin):
     inlines = (RecipeIngredientInline,)
 
     def get_ingredients(self, obj):
-        return ", ".join(
-            [ingredient.name for ingredient in obj.ingredients.all()]
-        )
+        return ", ".join([ingredient.name for ingredient in obj.ingredients.all()])
 
-    get_ingredients.short_description = "Ingredients"
+    get_ingredients.short_description = "Ингредиенты"
+
+    def get_favorites_count(self, obj):
+        return obj.favorite_recipes.count()
+    get_favorites_count.short_description = 'Кол-во добавлений в избранное'
 
 
 @admin.register(RecipeIngredient)
