@@ -12,7 +12,9 @@ class CustomUser(AbstractUser):
         verbose_name="Фамилия",
     )
     email = models.EmailField(unique=True)
-    subscribers = models.ManyToManyField("self", symmetrical=False, blank=True)
+    subscribers = models.ManyToManyField(
+        "self", symmetrical=False, blank=True
+    )
     is_subscribed = models.BooleanField(default=False)
 
     class Meta:

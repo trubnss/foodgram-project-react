@@ -36,7 +36,9 @@ class UserSerializers(serializers.ModelSerializer):
     def get_is_subscribed(self, obj):
         if self.context["request"].user.is_authenticated:
             current_user = self.context["request"].user
-            is_subscribed = current_user.subscribers.filter(pk=obj.id).exists()
+            is_subscribed = current_user.subscribers.filter(
+                pk=obj.id
+            ).exists()
             return is_subscribed
         return False
 
@@ -128,7 +130,7 @@ class RecipeSerializer(serializers.ModelSerializer):
 
         ingredient_ids = [item["id"] for item in ingredients]
         if Ingredient.objects.filter(id__in=ingredient_ids).count() != len(
-            ingredient_ids
+                ingredient_ids
         ):
             raise serializers.ValidationError(
                 {
@@ -174,21 +176,16 @@ class RecipeSerializer(serializers.ModelSerializer):
         return representation
 
 
-class FavoriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Recipe
-        fields = ["id", "name", "image", "cooking_time"]
-
-
-class ShoppingListSerializer(serializers.ModelSerializer):
+class RecipeLightSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = ["id", "name", "image", "cooking_time"]
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    recipes = RecipeSerializer(many=True, read_only=True)
+    recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
+    is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
@@ -202,24 +199,24 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             "recipes",
             "recipes_count",
         ]
-        extra_kwargs = {
-            "is_subscribed": {"read_only": True},
-        }
 
     def get_recipes(self, obj):
-        subscribed_user = self.context["request"].user
-        recipes = Recipe.objects.filter(
-            author=obj, subscribers=subscribed_user
+        recipes_limit_param = self.context["request"].query_params.get(
+            "recipes_limit"
         )
-        return RecipeSerializer(
-            recipes, many=True, context={"request": self.context["request"]}
+        recipes_limit = (
+            int(recipes_limit_param)
+            if recipes_limit_param and recipes_limit_param.isdigit()
+            else None
+        )
+        recipes = Recipe.objects.filter(author=obj)[:recipes_limit]
+        return RecipeLightSerializer(
+            recipes, many=True, context=self.context
         ).data
 
     def get_recipes_count(self, obj):
-        return len(self.get_recipes(obj)) if hasattr(obj, "recipes") else 0
+        return Recipe.objects.filter(author=obj).count()
 
-    def to_representation(self, instance):
-        ret = super().to_representation(instance)
-        if "recipes" not in ret:
-            ret["recipes"] = []
-        return ret
+    def get_is_subscribed(self, obj):
+        request_user = self.context["request"].user
+        return request_user.subscribers.filter(pk=obj.pk).exists()

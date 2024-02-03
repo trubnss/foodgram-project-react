@@ -18,8 +18,7 @@ from api.serializers import (
     TagSerializer,
     IngredientSerializer,
     RecipeSerializer,
-    FavoriteSerializer,
-    ShoppingListSerializer,
+    RecipeLightSerializer,
     RecipeIngredientSerializer,
 )
 from rest_framework.decorators import action
@@ -59,7 +58,7 @@ class IngredientViewSet(
 class BaseRecipeViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
     model = None
-    serializer_class = None
+    serializer_class = RecipeLightSerializer
     not_exist_message = "Рецепта не существует"
     already_exists_message = "Рецепт уже существует в данном списке."
     removed_message = "Рецепт удален из списка."
@@ -79,14 +78,17 @@ class BaseRecipeViewSet(viewsets.ViewSet):
             )
         item = self.model.objects.create(user=user, recipe=recipe)
         serialized_recipe = self.serializer_class(item.recipe)
-        return Response(serialized_recipe.data, status=status.HTTP_201_CREATED)
+        return Response(
+            serialized_recipe.data, status=status.HTTP_201_CREATED
+        )
 
     def remove(self, request, pk=None):
         user = request.user
         recipe = get_object_or_404(Recipe, pk=pk)
 
-        item_exists = self.model.objects.filter(user=user,
-                                                recipe=recipe).exists()
+        item_exists = self.model.objects.filter(
+            user=user, recipe=recipe
+        ).exists()
         if not item_exists:
             return Response(
                 {"message": self.not_exist_message},
@@ -102,14 +104,12 @@ class BaseRecipeViewSet(viewsets.ViewSet):
 
 class FavoriteViewSet(BaseRecipeViewSet):
     model = Favorite
-    serializer_class = FavoriteSerializer
     already_exists_message = "Рецепт уже в избранном."
     removed_message = "Рецепт удален из избранного."
 
 
 class ShoppingCartViewSet(BaseRecipeViewSet):
     model = ShoppingList
-    serializer_class = ShoppingListSerializer
     already_exists_message = "Рецепт уже в списке покупок."
     removed_message = "Рецепт удален из списка покупок."
 
@@ -140,7 +140,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         recipe.tags.set(tag_ids)
 
         for ingredient in ingredient_data:
-            ingredient_obj = get_object_or_404(Ingredient, id=ingredient["id"])
+            ingredient_obj = get_object_or_404(
+                Ingredient, id=ingredient["id"]
+            )
             RecipeIngredient.objects.create(
                 recipe=recipe,
                 ingredient=ingredient_obj,
@@ -170,6 +172,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         instance = self.get_object()
 
+        if "image" not in data:
+            data["image"] = instance.image
+
         serializer = self.get_serializer(
             instance, data=data, partial=kwargs.get("partial", False)
         )
@@ -181,7 +186,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         RecipeIngredient.objects.filter(recipe=recipe).delete()
 
         for ingredient in ingredient_data:
-            ingredient_obj = get_object_or_404(Ingredient, id=ingredient["id"])
+            ingredient_obj = get_object_or_404(
+                Ingredient, id=ingredient["id"]
+            )
             RecipeIngredient.objects.create(
                 recipe=recipe,
                 ingredient=ingredient_obj,
@@ -218,7 +225,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         for item in shopping_cart_recipes:
             recipe = item.recipe
-            recipe_ingredients = RecipeIngredient.objects.filter(recipe=recipe)
+            recipe_ingredients = RecipeIngredient.objects.filter(
+                recipe=recipe
+            )
 
             for recipe_ingredient in recipe_ingredients:
                 ingredient = recipe_ingredient.ingredient
@@ -232,8 +241,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         content = "Список ингредиентов для покупки:\n"
         for (
-                ingredient_name,
-                measurement_unit,
+            ingredient_name,
+            measurement_unit,
         ), amount in ingredients_summary.items():
             content += f"{ingredient_name}: {amount} {measurement_unit}\n"
 

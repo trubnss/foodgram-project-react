@@ -41,10 +41,15 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("name", models.CharField(max_length=100, verbose_name="Название")),
+                (
+                    "name",
+                    models.CharField(max_length=100, verbose_name="Название"),
+                ),
                 (
                     "measurement_unit",
-                    models.CharField(max_length=50, verbose_name="Единица измерения"),
+                    models.CharField(
+                        max_length=50, verbose_name="Единица измерения"
+                    ),
                 ),
             ],
             options={
@@ -64,12 +69,20 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("name", models.CharField(max_length=100, verbose_name="Название")),
-                ("image", models.ImageField(upload_to="", verbose_name="Картинка")),
+                (
+                    "name",
+                    models.CharField(max_length=100, verbose_name="Название"),
+                ),
+                (
+                    "image",
+                    models.ImageField(upload_to="", verbose_name="Картинка"),
+                ),
                 ("text", models.TextField(verbose_name="Описание")),
                 (
                     "cooking_time",
-                    models.PositiveIntegerField(verbose_name="Время приготовления"),
+                    models.PositiveIntegerField(
+                        verbose_name="Время приготовления"
+                    ),
                 ),
             ],
             options={
@@ -89,7 +102,10 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("amount", models.PositiveIntegerField(verbose_name="Количество")),
+                (
+                    "amount",
+                    models.PositiveIntegerField(verbose_name="Количество"),
+                ),
             ],
             options={
                 "verbose_name": "Ингредиент рецепта",

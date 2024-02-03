@@ -93,12 +93,18 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         user = request.user
-        subscribed_users = user.subscribers.all()
-        paginated_subscribed_users = self.paginate_queryset(subscribed_users)
+        subscriptions = user.subscribers.all()
+        page = self.paginate_queryset(subscriptions)
+        if page is not None:
+            serializer = SubscriptionSerializer(
+                page, many=True, context={"request": request}
+            )
+            return self.get_paginated_response(serializer.data)
+
         serializer = SubscriptionSerializer(
-            paginated_subscribed_users, many=True, context={"request": request}
+            subscriptions, many=True, context={"request": request}
         )
-        return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
 
     def create(self, request, pk=None):
         if not CustomUser.objects.filter(pk=pk).exists():
@@ -114,7 +120,7 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "message": "Нельзя подписаться или"
-                               " отписаться на самого себя"
+                    " отписаться на самого себя"
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -129,7 +135,9 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
         user.subscribers.add(author)
         user.save()
         recipes = Recipe.objects.filter(author=author)
-        serializer = SubscriptionSerializer(user, context={"request": request})
+        serializer = SubscriptionSerializer(
+            user, context={"request": request}
+        )
         serialized_data = serializer.data
 
         serialized_data["recipes"] = RecipeSerializer(
