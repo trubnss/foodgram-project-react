@@ -14,6 +14,7 @@ from recipes.models import (
     ShoppingList,
     Tag,
 )
+from api.constants import (MIN_AMOUNT, MIN_COOKING_TIME)
 
 
 class UserSerializers(serializers.ModelSerializer):
@@ -103,9 +104,10 @@ class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         amount = data.get("amount", 0)
-        if int(amount) < 1:
+        if int(amount) < MIN_AMOUNT:
             raise serializers.ValidationError(
-                {"amount": "Количество ингредиента должно быть больше 0."}
+                {"amount": f"Количество ингредиента не "
+                           f"должно быть меньше {MIN_AMOUNT}."}
             )
         return data
 
@@ -157,7 +159,7 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return value
 
     def validate_cooking_time(self, value):
-        if value < 1:
+        if  value < MIN_COOKING_TIME:
             raise serializers.ValidationError(
                 "Время приготовления должно быть больше 0."
             )
