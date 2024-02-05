@@ -1,40 +1,31 @@
-from collections import defaultdict
-
+from django.db.models import Sum
 from django.http import HttpResponse
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, viewsets, status
 from django.utils.text import slugify
+from django_filters.rest_framework import DjangoFilterBackend
 
-from recipes.models import (
-    Tag,
-    Ingredient,
-    Recipe,
-    Favorite,
-    ShoppingList,
-    RecipeIngredient,
-)
-
-from api.serializers import (
-    TagSerializer,
-    IngredientSerializer,
-    RecipeSerializer,
-    RecipeLightSerializer,
-    RecipeIngredientSerializer,
-)
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import (
-    AllowAny,
-    IsAuthenticatedOrReadOnly,
-    IsAuthenticated,
-)
-
-from api.filters import IngredientSearchFilter, RecipeFilter
-
-from api.paginations import CustomPagination
+from rest_framework.permissions import AllowAny, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
+from api.filters import IngredientSearchFilter, RecipeFilter
+from api.paginations import CustomPagination
 from api.permissions import IsRecipeAuthorOrReadOnly
+from api.serializers import (
+    IngredientSerializer,
+    RecipeReadSerializer,
+    RecipeWriteSerializer,
+    TagSerializer,
+)
+from api.services import RecipeListService
+from recipes.models import (
+    Favorite,
+    Ingredient,
+    Recipe,
+    RecipeIngredient,
+    ShoppingList,
+    Tag,
+)
 
 
 class TagViewSet(
@@ -43,6 +34,7 @@ class TagViewSet(
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
     permission_class = [AllowAny]
+    pagination_class = None
 
 
 class IngredientViewSet(
@@ -51,200 +43,113 @@ class IngredientViewSet(
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     permission_classes = [AllowAny]
+    pagination_class = None
     filter_backends = (IngredientSearchFilter,)
     search_fields = ["^name"]
 
 
-class BaseRecipeViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]
-    model = None
-    serializer_class = RecipeLightSerializer
-    not_exist_message = "Рецепта не существует"
-    already_exists_message = "Рецепт уже существует в данном списке."
-    removed_message = "Рецепт удален из списка."
-
-    def add(self, request, pk=None):
-        user = request.user
-        recipe = Recipe.objects.filter(pk=pk).first()
-        if not recipe:
-            return Response(
-                {"message": self.not_exist_message},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if self.model.objects.filter(user=user, recipe=recipe).exists():
-            return Response(
-                {"message": self.already_exists_message},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        item = self.model.objects.create(user=user, recipe=recipe)
-        serialized_recipe = self.serializer_class(item.recipe)
-        return Response(
-            serialized_recipe.data, status=status.HTTP_201_CREATED
-        )
-
-    def remove(self, request, pk=None):
-        user = request.user
-        recipe = get_object_or_404(Recipe, pk=pk)
-
-        item_exists = self.model.objects.filter(
-            user=user, recipe=recipe
-        ).exists()
-        if not item_exists:
-            return Response(
-                {"message": self.not_exist_message},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        item = self.model.objects.get(user=user, recipe=recipe)
-        item.delete()
-        return Response(
-            {"message": self.removed_message},
-            status=status.HTTP_204_NO_CONTENT,
-        )
-
-
-class FavoriteViewSet(BaseRecipeViewSet):
-    model = Favorite
-    already_exists_message = "Рецепт уже в избранном."
-    removed_message = "Рецепт удален из избранного."
-
-
-class ShoppingCartViewSet(BaseRecipeViewSet):
-    model = ShoppingList
-    already_exists_message = "Рецепт уже в списке покупок."
-    removed_message = "Рецепт удален из списка покупок."
-
-
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsRecipeAuthorOrReadOnly]
     pagination_class = CustomPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
 
-    def perform_create(self, serializer):
-        return serializer.save(author=self.request.user)
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return RecipeReadSerializer
+        return RecipeWriteSerializer
 
     def create(self, request, *args, **kwargs):
-        data = request.data.copy()
-        tag_ids = data.get("tags", [])
-        ingredient_data = data.get("ingredients", [])
-
-        serializer = self.get_serializer(
-            data=data, context={"request": request}
-        )
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        recipe = serializer.save(author=request.user)
 
-        recipe = self.perform_create(serializer)
-
-        recipe.tags.set(tag_ids)
-
-        for ingredient in ingredient_data:
-            ingredient_obj = get_object_or_404(
-                Ingredient, id=ingredient["id"]
-            )
-            RecipeIngredient.objects.create(
-                recipe=recipe,
-                ingredient=ingredient_obj,
-                amount=ingredient["amount"],
-            )
-
-        response_data = RecipeSerializer(
+        read_serializer = RecipeReadSerializer(
             recipe, context={"request": request}
-        ).data
-        response_data["tags"] = TagSerializer(
-            Tag.objects.filter(id__in=tag_ids),
-            many=True,
-            context={"request": request},
-        ).data
-        response_data["ingredients"] = RecipeIngredientSerializer(
-            RecipeIngredient.objects.filter(recipe=recipe),
-            many=True,
-            context={"request": request},
-        ).data
-
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        )
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        data = request.data.copy()
-        tag_ids = data.get("tags", [])
-        ingredient_data = data.pop("ingredients", [])
-
+        partial = kwargs.pop("partial", False)
         instance = self.get_object()
-
-        if "image" not in data:
-            data["image"] = instance.image
-
         serializer = self.get_serializer(
-            instance, data=data, partial=kwargs.get("partial", False)
+            instance, data=request.data, partial=partial
         )
-
         serializer.is_valid(raise_exception=True)
         recipe = serializer.save()
 
-        recipe.tags.set(tag_ids)
-        RecipeIngredient.objects.filter(recipe=recipe).delete()
+        read_serializer = RecipeReadSerializer(
+            recipe, context={"request": request}
+        )
+        return Response(read_serializer.data, status=status.HTTP_200_OK)
 
-        for ingredient in ingredient_data:
-            ingredient_obj = get_object_or_404(
-                Ingredient, id=ingredient["id"]
-            )
-            RecipeIngredient.objects.create(
-                recipe=recipe,
-                ingredient=ingredient_obj,
-                amount=ingredient["amount"],
-            )
-
-        updated_recipe = self.get_serializer(recipe).data
-        return Response(updated_recipe, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["post", "delete"])
+    @action(detail=True, methods=[])
     def favorite(self, request, pk=None):
-        favorite_viewset = FavoriteViewSet()
-        if request.method == "POST":
-            return favorite_viewset.add(request, pk)
-        else:
-            return favorite_viewset.remove(request, pk)
+        pass
 
-    @action(detail=True, methods=["post", "delete"])
-    def shopping_cart(self, request, pk=None):
-        shopping_cart_viewset = ShoppingCartViewSet()
-        if request.method == "POST":
-            return shopping_cart_viewset.add(request, pk)
-        else:
-            return shopping_cart_viewset.remove(request, pk)
+    @favorite.mapping.post
+    def add_favorite(self, request, *args, **kwargs):
+        recipe_id = kwargs.get("pk")
+        response = RecipeListService.add(
+            request.user, recipe_id, Favorite, "Рецепт уже в избранном."
+        )
+        return response
+
+    @favorite.mapping.delete
+    def remove_favorite(self, request, *args, **kwargs):
+        recipe_id = kwargs.get("pk")
+        response = RecipeListService.remove(
+            request.user, recipe_id, Favorite, "Рецепт не найден в избранном."
+        )
+        return response
+
+    @action(detail=True, methods=[])
+    def shopping_cart(self, request, *args, **kwargs):
+        pass
+
+    @shopping_cart.mapping.post
+    def add_to_shopping_cart(self, request, *args, **kwargs):
+        recipe_id = kwargs.get("pk")
+        response = RecipeListService.add(
+            request.user,
+            recipe_id,
+            ShoppingList,
+            "Рецепт уже в списке покупок.",
+        )
+        return response
+
+    @shopping_cart.mapping.delete
+    def remove_from_shopping_cart(self, request, *args, **kwargs):
+        recipe_id = kwargs.get("pk")
+        response = RecipeListService.remove(
+            request.user,
+            recipe_id,
+            ShoppingList,
+            "Рецепт не найден в списке покупок.",
+        )
+        return response
 
     @action(detail=False, methods=["get"])
     def download_shopping_cart(self, request):
         user = request.user
-        shopping_cart_recipes = ShoppingList.objects.filter(
+        shopping_cart_items = ShoppingList.objects.filter(
             user=user
-        ).select_related("recipe")
+        ).values_list("recipe", flat=True)
 
-        ingredients_summary = defaultdict(float)
-
-        for item in shopping_cart_recipes:
-            recipe = item.recipe
-            recipe_ingredients = RecipeIngredient.objects.filter(
-                recipe=recipe
-            )
-
-            for recipe_ingredient in recipe_ingredients:
-                ingredient = recipe_ingredient.ingredient
-                amount = recipe_ingredient.amount
-                ingredient_name = ingredient.name
-                measurement_unit = ingredient.measurement_unit
-
-                ingredients_summary[
-                    (ingredient_name, measurement_unit)
-                ] += amount
+        ingredients_summary = (
+            RecipeIngredient.objects.filter(recipe__in=shopping_cart_items)
+            .values("ingredient__name", "ingredient__measurement_unit")
+            .annotate(total_amount=Sum("amount"))
+            .order_by("ingredient__name")
+        )
 
         content = "Список ингредиентов для покупки:\n"
-        for (
-            ingredient_name,
-            measurement_unit,
-        ), amount in ingredients_summary.items():
-            content += f"{ingredient_name}: {amount} {measurement_unit}\n"
+        for ingredient in ingredients_summary:
+            name = ingredient["ingredient__name"]
+            measurement_unit = ingredient["ingredient__measurement_unit"]
+            amount = ingredient["total_amount"]
+            content += f"{name}: {amount} {measurement_unit}\n"
 
         filename = f"shopping_cart_{user.username}.txt"
         slugified_filename = slugify(filename)

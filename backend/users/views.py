@@ -1,23 +1,22 @@
 from django.contrib.auth import update_session_auth_hash
+from django.db import models
+from django.db.models import Case, Value, When
 from djoser.serializers import SetPasswordSerializer
-from rest_framework import viewsets, status, permissions
+
+from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import (
-    IsAuthenticatedOrReadOnly,
-    IsAuthenticated,
-)
+from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import (IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
 from rest_framework.response import Response
 
-from .models import CustomUser
-from api.serializers import (
-    UserSerializers,
-    SubscriptionSerializer,
-    RecipeSerializer,
-)
-
 from api.paginations import CustomPagination
-
-from recipes.models import Recipe
+from api.serializers import (
+    ManageSubscriptionSerializer,
+    SubscriptionSerializer,
+    UserSerializers,
+)
+from .models import CustomUser, Subscription
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -32,6 +31,19 @@ class UserViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated()]
         else:
             return [IsAuthenticatedOrReadOnly()]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = CustomUser.objects.all()
+        if user.is_authenticated:
+            queryset = queryset.annotate(
+                is_subscribed=Case(
+                    When(followers__subscriber=user, then=Value(True)),
+                    default=Value(False),
+                    output_field=models.BooleanField(),
+                )
+            )
+        return queryset
 
     def perform_create(self, serializer):
         validated_data = serializer.validated_data
@@ -60,11 +72,11 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post", "delete"])
     def subscribe(self, request, pk=None):
-        subscription_viewset = SubscriptionViewSet()
+        subscription_viewset = SubscriptionViewSet(request=request)
         if request.method == "POST":
-            return subscription_viewset.create(request, pk=pk)
-        elif request.method == "DELETE":
-            return subscription_viewset.destroy(request, pk=pk)
+            return subscription_viewset.subscribe(request, pk)
+        else:
+            return subscription_viewset.unsubscribe(request, pk)
 
     @action(detail=False, methods=["post"])
     def set_password(self, request):
@@ -93,79 +105,54 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
 
     def list(self, request):
         user = request.user
-        subscriptions = user.subscribers.all()
-        page = self.paginate_queryset(subscriptions)
+        subscriptions = Subscription.objects.filter(
+            subscriber=user
+        ).select_related("subscribed_to")
+
+        subscribed_users = [
+            subscription.subscribed_to for subscription in subscriptions
+        ]
+
+        page = self.paginate_queryset(subscribed_users)
         if page is not None:
-            serializer = SubscriptionSerializer(
+            serialized_data = SubscriptionSerializer(
                 page, many=True, context={"request": request}
             )
-            return self.get_paginated_response(serializer.data)
+            return self.get_paginated_response(serialized_data.data)
 
-        serializer = SubscriptionSerializer(
-            subscriptions, many=True, context={"request": request}
+        serialized_data = SubscriptionSerializer(
+            subscribed_users, many=True, context={"request": request}
         )
-        return Response(serializer.data)
+        return Response(serialized_data.data)
 
-    def create(self, request, pk=None):
-        if not CustomUser.objects.filter(pk=pk).exists():
-            return Response(
-                {"message": "Пользователь не найден"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        author = CustomUser.objects.get(pk=pk)
-        user = request.user
-
-        if author == user:
-            return Response(
-                {
-                    "message": "Нельзя подписаться или"
-                    " отписаться на самого себя"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if author in user.subscribers.all():
-            return Response(
-                {"message": "Вы уже подписаны на этого пользователя"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user.is_subscribed = True
-        user.subscribers.add(author)
-        user.save()
-        recipes = Recipe.objects.filter(author=author)
-        serializer = SubscriptionSerializer(
-            user, context={"request": request}
+    def subscribe(self, request, pk=None):
+        serializer = ManageSubscriptionSerializer(
+            data={},
+            context={
+                "request": request,
+                "pk": pk,
+            },
         )
-        serialized_data = serializer.data
-
-        serialized_data["recipes"] = RecipeSerializer(
-            recipes, many=True, context={"request": request}
-        ).data
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    def destroy(self, request, pk=None):
-        if not CustomUser.objects.filter(pk=pk).exists():
-            return Response(
-                {"message": "Пользователь не найден"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        author = CustomUser.objects.get(pk=pk)
-        user = request.user
-
-        if author not in user.subscribers.all():
-            return Response(
-                {"message": "Вы еще не подписаны на этого пользователя"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        user.is_subscribed = False
-        user.subscribers.remove(author)
-        user.save()
-
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        subscribed_user = CustomUser.objects.get(pk=pk)
         return Response(
-            {"message": "Вы отписались от этого пользователя"},
-            status.HTTP_204_NO_CONTENT,
+            SubscriptionSerializer(
+                subscribed_user, context={"request": request}
+            ).data,
+            status=status.HTTP_201_CREATED,
         )
+
+    def unsubscribe(self, request, pk=None):
+        user_to_unsubscribe = get_object_or_404(CustomUser, pk=pk)
+        serializer = ManageSubscriptionSerializer(
+            instance=user_to_unsubscribe,
+            context={
+                "request": request,
+                "subscriber": request.user,
+                "subscribed_to": user_to_unsubscribe,
+                "pk": pk,
+            },
+        )
+        result = serializer.remove_subscription()
+        return Response(result, status=status.HTTP_204_NO_CONTENT)

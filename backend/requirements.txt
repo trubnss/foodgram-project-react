@@ -24,6 +24,7 @@ flake8==6.1.0
 frozenlist==1.4.0
 gunicorn==20.1.0
 idna==3.4
+isort==5.13.2
 mccabe==0.7.0
 multidict==6.0.4
 mypy-extensions==1.0.0

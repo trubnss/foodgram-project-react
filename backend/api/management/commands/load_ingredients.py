@@ -1,6 +1,8 @@
-import os
 import csv
+import os
+
 from django.core.management.base import BaseCommand
+
 from recipes.models import Ingredient
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

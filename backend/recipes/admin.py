@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import Tag, Ingredient, Recipe, RecipeIngredient
+from django.forms import CheckboxSelectMultiple
+
+from .models import (Favorite,
+                     Ingredient,
+                     Recipe,
+                     RecipeIngredient,
+                     ShoppingList,
+                     Tag)
 
 
 class RecipeIngredientInline(admin.TabularInline):
@@ -31,6 +38,7 @@ class RecipeAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "author",
+        "get_tags",
         "get_ingredients",
         "get_favorites_count",
     )
@@ -41,15 +49,24 @@ class RecipeAdmin(admin.ModelAdmin):
     )
     inlines = (RecipeIngredientInline,)
 
+    @admin.display(description="Теги")
+    def get_tags(self, obj):
+        return ", ".join([tag.name for tag in obj.tags.all()])
+
+    @admin.display(description="Ингредиенты")
     def get_ingredients(self, obj):
-        return ", ".join([ingredient.name for ingredient in
-                          obj.ingredients.all()])
+        return ", ".join(
+            [ingredient.name for ingredient in obj.ingredients.all()]
+        )
 
-    get_ingredients.short_description = "Ингредиенты"
-
+    @admin.display(description="Кол-во добавлений в избранное")
     def get_favorites_count(self, obj):
         return obj.favorite_recipes.count()
-    get_favorites_count.short_description = 'Кол-во добавлений в избранное'
+
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "tags":
+            kwargs["widget"] = CheckboxSelectMultiple()
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
 
 
 @admin.register(RecipeIngredient)
@@ -59,3 +76,15 @@ class RecipeIngredientAdmin(admin.ModelAdmin):
         "ingredient",
         "amount",
     )
+
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ("user", "recipe")
+    list_filter = ("user", "recipe")
+
+
+@admin.register(ShoppingList)
+class ShoppingListAdmin(admin.ModelAdmin):
+    list_display = ("user", "recipe")
+    list_filter = ("user", "recipe")
