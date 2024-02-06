@@ -1,5 +1,6 @@
 import re
 
+from django.core.validators import MinValueValidator, MaxValueValidator
 from drf_extra_fields.fields import Base64ImageField
 
 from rest_framework import serializers
@@ -14,7 +15,12 @@ from recipes.models import (
     ShoppingList,
     Tag,
 )
-from api.constants import (MIN_AMOUNT, MIN_COOKING_TIME)
+from api.constants import (
+    MIN_AMOUNT,
+    MAX_AMOUNT,
+    MIN_COOKING_TIME,
+    MAX_COOKING_TIME,
+)
 
 
 class UserSerializers(serializers.ModelSerializer):
@@ -48,12 +54,18 @@ class UserSerializers(serializers.ModelSerializer):
     def validate_username(self, value):
         if not re.match(r"^[\w.@+-]+\Z", value):
             raise serializers.ValidationError(
-                "Имя пользователя содержит недопустимые символы."
+                {
+                    "message": "Имя пользователя содержит"
+                    " недопустимые символы."
+                }
             )
 
         if value.lower() == "me":
             raise serializers.ValidationError(
-                "Имя 'me' нельзя использовать в качестве имени пользователя."
+                {
+                    "message": "Имя 'me' нельзя использовать"
+                    " в качестве имени пользователя."
+                }
             )
 
         return value
@@ -93,10 +105,17 @@ class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
         queryset=Ingredient.objects.all(),
         source="ingredient",
         error_messages={
-            "does_not_exist": "Ингредиент с id {pk_value} не существует."
+            "does_not_exist": "Ингредиент" " с id {pk_value} не существует."
         },
     )
-    amount = serializers.IntegerField()
+    amount = serializers.IntegerField(
+        validators=[
+            MinValueValidator(
+                MIN_COOKING_TIME, "Количество не может быть менее 1."
+            ),
+            MaxValueValidator(MAX_AMOUNT, "Количество слишком большое."),
+        ]
+    )
 
     class Meta:
         model = RecipeIngredient
@@ -106,8 +125,10 @@ class RecipeIngredientWriteSerializer(serializers.ModelSerializer):
         amount = data.get("amount", 0)
         if int(amount) < MIN_AMOUNT:
             raise serializers.ValidationError(
-                {"amount": f"Количество ингредиента не "
-                           f"должно быть меньше {MIN_AMOUNT}."}
+                {
+                    "amount": f"Количество ингредиента не "
+                    f"должно быть меньше {MIN_AMOUNT}."
+                }
             )
         return data
 
@@ -118,6 +139,17 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         many=True, queryset=Tag.objects.all()
     )
     image = Base64ImageField()
+    cooking_time = serializers.IntegerField(
+        validators=[
+            MinValueValidator(
+                MIN_COOKING_TIME,
+                "Время приготовления должно быть больше или равно 1.",
+            ),
+            MaxValueValidator(
+                MAX_COOKING_TIME, "Время приготовления слишком большое."
+            ),
+        ]
+    )
 
     class Meta:
         model = Recipe
@@ -133,45 +165,49 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
     def validate_image(self, value):
         if not value:
             raise serializers.ValidationError(
-                "Поле image не может быть пустым."
+                {"message": "Поле image не может быть пустым."}
             )
         return value
 
     def validate_tags(self, value):
         if not value:
             raise serializers.ValidationError(
-                "Поле tags не может быть пустым."
+                {"message": "Поле tags не может быть пустым."}
             )
         if len(value) != len(set(value)):
-            raise serializers.ValidationError("Теги не должны повторяться.")
+            raise serializers.ValidationError(
+                {"message": "Теги не должны повторяться."}
+            )
         return value
 
     def validate_ingredients(self, value):
         if not value:
             raise serializers.ValidationError(
-                "Поле ingredients не может быть пустым."
+                {"message": "Поле ingredients не может быть пустым."}
             )
         ingredient_ids = [item["ingredient"].id for item in value]
         if len(ingredient_ids) != len(set(ingredient_ids)):
             raise serializers.ValidationError(
-                "Ингредиенты не должны повторяться."
+                {"message": "Ингредиенты не должны повторяться."}
             )
         return value
 
     def validate_cooking_time(self, value):
-        if  value < MIN_COOKING_TIME:
+        if value < MIN_COOKING_TIME:
             raise serializers.ValidationError(
-                "Время приготовления должно быть больше 0."
+                {"message": "Время приготовления должно быть больше 0."}
             )
         return value
 
     def validate(self, data):
         if self.instance and (
-                "tags" not in data or "ingredients" not in data
+            "tags" not in data or "ingredients" not in data
         ):
             raise serializers.ValidationError(
-                "Поля 'tags' и 'ingredients' должны "
-                "быть предоставлены при обновлении."
+                {
+                    "message": "Поля 'tags' и 'ingredients' должны "
+                    "быть предоставлены при обновлении."
+                }
             )
         return data
 
@@ -310,14 +346,14 @@ class ManageSubscriptionSerializer(serializers.Serializer):
 
         if subscriber == subscribed_to:
             raise serializers.ValidationError(
-                "Нельзя подписаться на самого себя."
+                {"message": "Нельзя подписаться на самого себя."}
             )
 
         if Subscription.objects.filter(
-                subscriber=subscriber, subscribed_to=subscribed_to
+            subscriber=subscriber, subscribed_to=subscribed_to
         ).exists():
             raise serializers.ValidationError(
-                "Вы уже подписаны на этого пользователя."
+                {"message": "Вы уже подписаны на этого пользователя."}
             )
 
         subscription = Subscription.objects.create(
@@ -337,5 +373,5 @@ class ManageSubscriptionSerializer(serializers.Serializer):
             return {"message": "Вы успешно отписались."}
         else:
             raise serializers.ValidationError(
-                "Вы не подписаны на этого пользователя."
+                {"message": "Вы не подписаны на этого пользователя."}
             )
