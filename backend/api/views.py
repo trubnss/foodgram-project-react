@@ -8,9 +8,11 @@ from djoser.serializers import SetPasswordSerializer
 
 from rest_framework import mixins, status, viewsets, permissions
 from rest_framework.decorators import action
-from rest_framework.permissions import (AllowAny,
-                                        IsAuthenticatedOrReadOnly,
-                                        IsAuthenticated)
+from rest_framework.permissions import (
+    AllowAny,
+    IsAuthenticatedOrReadOnly,
+    IsAuthenticated,
+)
 from rest_framework.response import Response
 from rest_framework.generics import get_object_or_404
 
@@ -38,9 +40,9 @@ from recipes.models import (
 from users.models import CustomUser, Subscription
 
 
-class BaseViewSet(mixins.ListModelMixin,
-                  mixins.RetrieveModelMixin,
-                  viewsets.GenericViewSet):
+class BaseViewSet(
+    mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
+):
     permission_classes = [AllowAny]
     pagination_class = None
 
@@ -70,9 +72,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeWriteSerializer
 
     def get_serializer_response(self, recipe, context, status_code):
-        read_serializer = RecipeReadSerializer(
-            recipe, context=context
-        )
+        read_serializer = RecipeReadSerializer(recipe, context=context)
         return Response(read_serializer.data, status=status_code)
 
     def perform_create(self, serializer):
@@ -84,7 +84,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         recipe = self.perform_create(serializer)
         return self.get_serializer_response(
-            recipe, {"request": request}, status.HTTP_201_CREATED)
+            recipe, {"request": request}, status.HTTP_201_CREATED
+        )
 
     def perform_update(self, serializer):
         return serializer.save()
@@ -98,7 +99,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         recipe = self.perform_update(serializer)
         return self.get_serializer_response(
-            recipe, {"request": request}, status.HTTP_200_OK)
+            recipe, {"request": request}, status.HTTP_200_OK
+        )
 
     @action(detail=True, methods=[])
     def favorite(self, request, pk=None):
@@ -152,7 +154,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         ingredients_summary = (
             RecipeIngredient.objects.filter(
-                recipe__shopping_list_recipes__user=user)
+                recipe__shopping_list_recipes__user=user
+            )
             .values("ingredient__name", "ingredient__measurement_unit")
             .annotate(total_amount=Sum("amount"))
             .order_by("ingredient__name")
@@ -169,8 +172,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
         slugified_filename = slugify(filename)
 
         response = HttpResponse(content, content_type="text/plain")
-        response["Content-Disposition"] = \
-            f'attachment; filename="{slugified_filename}"'
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="{slugified_filename}"'
         return response
 
 

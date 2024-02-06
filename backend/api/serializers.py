@@ -8,11 +8,9 @@ from rest_framework.generics import get_object_or_404
 
 from users.models import CustomUser, Subscription
 from recipes.models import (
-    Favorite,
     Ingredient,
     Recipe,
     RecipeIngredient,
-    ShoppingList,
     Tag,
 )
 from .constants import (
@@ -56,7 +54,7 @@ class UserSerializers(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {
                     "message": "Имя пользователя содержит"
-                               " недопустимые символы."
+                    " недопустимые символы."
                 }
             )
 
@@ -64,7 +62,7 @@ class UserSerializers(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {
                     "message": "Имя 'me' нельзя использовать"
-                               " в качестве имени пользователя."
+                    " в качестве имени пользователя."
                 }
             )
 
@@ -183,12 +181,12 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance and (
-                "tags" not in data or "ingredients" not in data
+            "tags" not in data or "ingredients" not in data
         ):
             raise serializers.ValidationError(
                 {
                     "message": "Поля 'tags' и 'ingredients' должны "
-                               "быть предоставлены при обновлении."
+                    "быть предоставлены при обновлении."
                 }
             )
         return data
@@ -219,7 +217,9 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         instance.name = validated_data.get("name", instance.name)
         instance.image = validated_data.get("image", instance.image)
         instance.text = validated_data.get("text", instance.text)
-        instance.cooking_time = validated_data.get("cooking_time", instance.cooking_time)
+        instance.cooking_time = validated_data.get(
+            "cooking_time", instance.cooking_time
+        )
 
         tags_data = validated_data.get("tags")
         if tags_data is not None:
@@ -330,7 +330,7 @@ class ManageSubscriptionSerializer(serializers.Serializer):
             )
 
         if Subscription.objects.filter(
-                subscriber=subscriber, subscribed_to=subscribed_to
+            subscriber=subscriber, subscribed_to=subscribed_to
         ).exists():
             raise serializers.ValidationError(
                 {"message": "Вы уже подписаны на этого пользователя."}
