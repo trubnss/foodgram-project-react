@@ -208,15 +208,6 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
     def handle_ingredients(self, recipe, ingredients_data):
         RecipeIngredient.objects.filter(recipe=recipe).delete()
-        for ingredient_data in ingredients_data:
-            RecipeIngredient.objects.create(
-                recipe=recipe,
-                ingredient=ingredient_data["ingredient"],
-                amount=ingredient_data["amount"],
-            )
-
-    def handle_ingredients(self, recipe, ingredients_data):
-        RecipeIngredient.objects.filter(recipe=recipe).delete()
 
         recipe_ingredients = [
             RecipeIngredient(
