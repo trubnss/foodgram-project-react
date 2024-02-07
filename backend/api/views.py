@@ -71,24 +71,23 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return RecipeReadSerializer
         return RecipeWriteSerializer
 
+    """
+    Не могу убрать переопределение методов, сразу все ломается,
+    поскольку возвращаю ответ другим сериализатором
+    в рамках вызванного метода.
+    """
+
     def get_serializer_response(self, recipe, context, status_code):
         read_serializer = RecipeReadSerializer(recipe, context=context)
         return Response(read_serializer.data, status=status_code)
 
-    def perform_create(self, serializer):
-        recipe = serializer.save(author=self.request.user)
-        return recipe
-
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        recipe = self.perform_create(serializer)
+        recipe = serializer.save()
         return self.get_serializer_response(
             recipe, {"request": request}, status.HTTP_201_CREATED
         )
-
-    def perform_update(self, serializer):
-        return serializer.save()
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
@@ -97,7 +96,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             instance, data=request.data, partial=partial
         )
         serializer.is_valid(raise_exception=True)
-        recipe = self.perform_update(serializer)
+        recipe = serializer.save()
         return self.get_serializer_response(
             recipe, {"request": request}, status.HTTP_200_OK
         )
@@ -203,12 +202,6 @@ class UserViewSet(viewsets.ModelViewSet):
                 )
             )
         return queryset
-
-    def perform_create(self, serializer):
-        validated_data = serializer.validated_data
-        user = CustomUser.objects.create_user(**validated_data)
-        serializer.instance = user
-        serializer.fields.pop("is_subscribed", None)
 
     @action(detail=False, methods=["get"])
     def me(self, request):

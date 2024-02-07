@@ -49,12 +49,24 @@ class UserSerializers(serializers.ModelSerializer):
             ).exists()
         return False
 
+    def create(self, validated_data):
+        user = CustomUser.objects.create_user(**validated_data)
+        return user
+
+    def to_representation(self, instance):
+        request = self.context.get('request')
+        if request and request.method == 'POST':
+            data = super().to_representation(instance)
+            data.pop('is_subscribed', None)
+            return data
+        return super().to_representation(instance)
+
     def validate_username(self, value):
         if not re.match(r"^[\w.@+-]+\Z", value):
             raise serializers.ValidationError(
                 {
                     "message": "Имя пользователя содержит"
-                    " недопустимые символы."
+                               " недопустимые символы."
                 }
             )
 
@@ -62,7 +74,7 @@ class UserSerializers(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {
                     "message": "Имя 'me' нельзя использовать"
-                    " в качестве имени пользователя."
+                               " в качестве имени пользователя."
                 }
             )
 
@@ -181,12 +193,12 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if self.instance and (
-            "tags" not in data or "ingredients" not in data
+                "tags" not in data or "ingredients" not in data
         ):
             raise serializers.ValidationError(
                 {
                     "message": "Поля 'tags' и 'ingredients' должны "
-                    "быть предоставлены при обновлении."
+                               "быть предоставлены при обновлении."
                 }
             )
         return data
@@ -203,10 +215,27 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
                 amount=ingredient_data["amount"],
             )
 
+    def handle_ingredients(self, recipe, ingredients_data):
+        RecipeIngredient.objects.filter(recipe=recipe).delete()
+
+        recipe_ingredients = [
+            RecipeIngredient(
+                recipe=recipe,
+                ingredient=ingredient_data['ingredient'],
+                amount=ingredient_data['amount']
+            )
+            for ingredient_data in ingredients_data
+        ]
+
+        recipe_ingredients.sort(key=lambda x: x.ingredient.name)
+        RecipeIngredient.objects.bulk_create(recipe_ingredients)
+
     def create(self, validated_data):
         tags_data = validated_data.pop("tags")
         ingredients_data = validated_data.pop("ingredients")
-        recipe = Recipe.objects.create(**validated_data)
+        user = self.context['request'].user
+
+        recipe = Recipe.objects.create(author=user, **validated_data)
 
         self.handle_tags(recipe, tags_data)
         self.handle_ingredients(recipe, ingredients_data)
@@ -330,7 +359,7 @@ class ManageSubscriptionSerializer(serializers.Serializer):
             )
 
         if Subscription.objects.filter(
-            subscriber=subscriber, subscribed_to=subscribed_to
+                subscriber=subscriber, subscribed_to=subscribed_to
         ).exists():
             raise serializers.ValidationError(
                 {"message": "Вы уже подписаны на этого пользователя."}
