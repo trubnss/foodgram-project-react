@@ -71,36 +71,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return RecipeReadSerializer
         return RecipeWriteSerializer
 
-    """
-    Не могу убрать переопределение методов, сразу все ломается,
-    поскольку возвращаю ответ другим сериализатором
-    в рамках вызванного метода.
-    """
-
-    def get_serializer_response(self, recipe, context, status_code):
-        read_serializer = RecipeReadSerializer(recipe, context=context)
-        return Response(read_serializer.data, status=status_code)
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        recipe = serializer.save()
-        return self.get_serializer_response(
-            recipe, {"request": request}, status.HTTP_201_CREATED
-        )
-
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop("partial", False)
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=partial
-        )
-        serializer.is_valid(raise_exception=True)
-        recipe = serializer.save()
-        return self.get_serializer_response(
-            recipe, {"request": request}, status.HTTP_200_OK
-        )
-
     @action(detail=True, methods=[])
     def favorite(self, request, pk=None):
         pass

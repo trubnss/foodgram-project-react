@@ -161,6 +161,10 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
             "ingredients",
         ]
 
+    def to_representation(self, instance):
+        serializer = RecipeReadSerializer(instance, context=self.context)
+        return serializer.data
+
     def validate_image(self, value):
         if not value:
             raise serializers.ValidationError(
