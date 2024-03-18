@@ -41,18 +41,31 @@ from users.models import CustomUser, Subscription
 
 
 class BaseViewSet(
-    mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet
-):
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet):
+    """
+    Базовый ViewSet для предоставления списков и деталей моделей
+    """
+
     permission_classes = [AllowAny]
     pagination_class = None
 
 
 class TagViewSet(BaseViewSet):
+    """
+    ViewSet для тегов рецептов
+    """
+
     queryset = Tag.objects.all()
     serializer_class = TagSerializer
 
 
 class IngredientViewSet(BaseViewSet):
+    """
+    ViewSet для ингредиентов
+    """
+
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     filter_backends = (IngredientSearchFilter,)
@@ -60,12 +73,17 @@ class IngredientViewSet(BaseViewSet):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для рецептов
+    """
+
     queryset = Recipe.objects.all()
     permission_classes = [IsAuthenticatedOrReadOnly, IsRecipeAuthorOrReadOnly]
     pagination_class = CustomPagination
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
 
+    # Выбор класса сериализатора в зависимости от действия
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return RecipeReadSerializer
@@ -75,6 +93,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def favorite(self, request, pk=None):
         pass
 
+    # Добавление рецепта в избранное
     @favorite.mapping.post
     def add_favorite(self, request, *args, **kwargs):
         recipe_id = kwargs.get("pk")
@@ -83,6 +102,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
         return response
 
+    # Удаление рецепта из избранного
     @favorite.mapping.delete
     def remove_favorite(self, request, *args, **kwargs):
         recipe_id = kwargs.get("pk")
@@ -95,6 +115,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def shopping_cart(self, request, *args, **kwargs):
         pass
 
+    # Добавление рецепта в список покупок
     @shopping_cart.mapping.post
     def add_to_shopping_cart(self, request, *args, **kwargs):
         recipe_id = kwargs.get("pk")
@@ -106,6 +127,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
         return response
 
+    # Удаление рецепта из списка покупок
     @shopping_cart.mapping.delete
     def remove_from_shopping_cart(self, request, *args, **kwargs):
         recipe_id = kwargs.get("pk")
@@ -117,6 +139,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         )
         return response
 
+    # Загрузка списка покупок в виде текстового файла
     @action(detail=False, methods=["get"])
     def download_shopping_cart(self, request):
         user = request.user
@@ -148,6 +171,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 
 class UserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для пользователей
+    """
+
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializers
     pagination_class = CustomPagination
@@ -160,6 +187,7 @@ class UserViewSet(viewsets.ModelViewSet):
         else:
             return [IsAuthenticatedOrReadOnly()]
 
+    # Возвращает права доступа в зависимости от действия
     def get_queryset(self):
         user = self.request.user
         queryset = CustomUser.objects.all()
@@ -173,15 +201,18 @@ class UserViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+    # Возвращает запрос на выборку пользователей
     @action(detail=False, methods=["get"])
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
+    # Получение информации о текущем пользователе
     @action(detail=False, methods=["get"])
     def subscriptions(self, request, pk=None):
         return SubscriptionViewSet.list(self, request)
 
+    # Получение подписок пользователя
     @action(detail=True, methods=["post", "delete"])
     def subscribe(self, request, pk=None):
         subscription_viewset = SubscriptionViewSet(request=request)
@@ -190,6 +221,7 @@ class UserViewSet(viewsets.ModelViewSet):
         else:
             return subscription_viewset.unsubscribe(request, pk)
 
+    # Изменение пароля пользователя
     @action(detail=False, methods=["post"])
     def set_password(self, request):
         serializer = SetPasswordSerializer(
@@ -212,9 +244,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class SubscriptionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для управления подписками
+    """
+
     permission_classes = [IsAuthenticated]
     pagination_class = CustomPagination
 
+    # Получение списка подписок пользователя
     def list(self, request):
         user = request.user
         subscriptions = Subscription.objects.filter(
@@ -237,6 +274,7 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
         )
         return Response(serialized_data.data)
 
+    # Подписка на пользователя
     def subscribe(self, request, pk=None):
         serializer = ManageSubscriptionSerializer(
             data={},
@@ -255,6 +293,7 @@ class SubscriptionViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    # Отписка от пользователя
     def unsubscribe(self, request, pk=None):
         user_to_unsubscribe = get_object_or_404(CustomUser, pk=pk)
         serializer = ManageSubscriptionSerializer(

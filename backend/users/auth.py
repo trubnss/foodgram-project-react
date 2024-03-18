@@ -2,6 +2,10 @@ from .models import CustomUser
 
 
 class EmailAuthBackend(object):
+    """
+    Аутентификация пользователя по адресу электронной почты и паролю.
+    """
+
     def authenticate(self, request, username=None, password=None):
         try:
             user = CustomUser.objects.get(email=username)

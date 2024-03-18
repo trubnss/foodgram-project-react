@@ -2,6 +2,10 @@ from rest_framework import permissions
 
 
 class IsRecipeAuthorOrReadOnly(permissions.BasePermission):
+    """
+    Пользовательское разрешение для проверки авторства.
+    """
+
     def has_object_permission(self, request, view, obj):
         return (
             request.method in permissions.SAFE_METHODS

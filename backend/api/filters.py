@@ -6,10 +6,18 @@ from recipes.models import Recipe
 
 
 class IngredientSearchFilter(SearchFilter):
+    """
+    Фильтр для поиска ингредиентов по имени
+    """
+
     search_param = "name"
 
 
 class RecipeFilter(filters.FilterSet):
+    """
+    Класс фильтра для рецептов
+    """
+
     tags = filters.AllValuesMultipleFilter(field_name="tags__slug")
     author = filters.AllValuesMultipleFilter(field_name="author__id")
     is_favorited = filters.BooleanFilter(method="filter_is_special")
@@ -19,6 +27,7 @@ class RecipeFilter(filters.FilterSet):
         model = Recipe
         fields = ("tags", "author", "is_favorited", "is_in_shopping_cart")
 
+    # фильтрация по избранным рецептам или рецептам в списке покупок
     def filter_is_special(self, queryset, name, value):
         if not self.request.user.is_authenticated:
             return queryset.none()
