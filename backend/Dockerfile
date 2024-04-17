@@ -2,7 +2,7 @@ FROM python:3.9
 
 WORKDIR /app
 
-RUN pip install gunicorn==20.1.0
+RUN pip install gunicorn==21.2.0
 
 COPY requirements.txt .
 
